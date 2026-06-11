@@ -1,0 +1,6 @@
+{
+  "name": "Map Lead Tracker",
+  "description": "Helps local business owners find clients from Google Maps data, record verbal audio memos via AI transcription, and track conversion rates and interactions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

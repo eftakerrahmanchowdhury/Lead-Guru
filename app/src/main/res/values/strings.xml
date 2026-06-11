@@ -1,0 +1,20 @@
+<resources>
+    <string name="app_name">Map Lead Tracker</string>
+    <string name="login_title">Welcome Back</string>
+    <string name="login_subtitle">Access your local B2B lead intelligence engine</string>
+    <string name="login_username_label">Email Address</string>
+    <string name="login_username_placeholder">e.g., admin@business.com</string>
+    <string name="login_password_label">Password</string>
+    <string name="login_password_placeholder">Enter security passcode</string>
+    <string name="login_button_text">Sign In Securely</string>
+    <string name="login_demo_button_text">Quick Demo Profile</string>
+    <string name="login_error_empty">Please enter your credentials.</string>
+    <string name="login_error_invalid">Invalid credentials. Tap Quick Demo Profile to test rapidly!</string>
+    <string name="login_forgot_password">Forgot Passcode?</string>
+    <string name="login_forgot_toast">Passcode reset instructions dispatched to your email.</string>
+    <string name="login_register_link">Request Admin Registration</string>
+    <string name="login_register_toast">New account requests are routed to corporate IT.</string>
+    <string name="login_remember_me">Keep me signed in</string>
+    <string name="login_success_toast">Secure authentication verified!</string>
+    <string name="login_pass_visibility_desc">Toggle pass visibility</string>
+</resources>
