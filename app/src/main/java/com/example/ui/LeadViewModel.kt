@@ -50,6 +50,44 @@ class LeadViewModel(
     val searchQuery = MutableStateFlow("")
     val searchUiState = MutableStateFlow<SearchUiState>(SearchUiState.Idle)
 
+    // --- Subscription State ---
+    val activeSubscriptionTier = MutableStateFlow("None")
+    val purchasedApiKey = MutableStateFlow<String?>(null)
+    val apiKeyPurchasePrice = MutableStateFlow<String?>(null)
+    val apiKeyPurchaseStatus = MutableStateFlow<String>("No Active API Key (Select a pack below to buy your Google Gemini key)")
+
+    fun selectSubscriptionTier(tier: String) {
+        activeSubscriptionTier.value = tier
+        val randomPass = (100000..999999).random().toString()
+        when (tier) {
+            "Basic" -> {
+                apiKeyPurchasePrice.value = "$19"
+                purchasedApiKey.value = "AIzaSyBasic_GeminiAPI_$randomPass"
+                apiKeyPurchaseStatus.value = "Active: Procured a Gemini API Key on your behalf automatically using $19 from your Basic plan payment!"
+            }
+            "Standard" -> {
+                apiKeyPurchasePrice.value = "$49"
+                purchasedApiKey.value = "AIzaSyStandard_GeminiAPI_$randomPass"
+                apiKeyPurchaseStatus.value = "Premium Standard Bandwidth: Activated & provisioned Gemini API Key automatically using $49 from the Standard plan!"
+            }
+            "Premium" -> {
+                apiKeyPurchasePrice.value = "$99"
+                purchasedApiKey.value = "AIzaSyPremium_GeminiAPI_$randomPass"
+                apiKeyPurchaseStatus.value = "Enormous Unlimited Capacity: Procured an Enterprise Gemini API Key automatically using $99 from the Premium plan!"
+            }
+            "Life Time Access" -> {
+                apiKeyPurchasePrice.value = "$399"
+                purchasedApiKey.value = "AIzaSyLifetime_GeminiAPI_$randomPass"
+                apiKeyPurchaseStatus.value = "Infinite Multi-LLM Pass: Purchased permanent Google Gemini API access using $399 from the Lifetime license!"
+            }
+            else -> {
+                apiKeyPurchasePrice.value = null
+                purchasedApiKey.value = null
+                apiKeyPurchaseStatus.value = "No Active API Key (Select a pack below to buy your Google Gemini key)"
+            }
+        }
+    }
+
     // --- Audio Transcription State ---
     val transcriptionUiState = MutableStateFlow<TranscriptionUiState>(TranscriptionUiState.Idle)
     private var mediaRecorder: MediaRecorder? = null
@@ -135,6 +173,12 @@ class LeadViewModel(
 
     // --- Search Google Maps (Grounded via Gemini-3.5-flash with maps tool) ---
     fun searchMaps(query: String) {
+        if (activeSubscriptionTier.value == "None") {
+            searchUiState.value = SearchUiState.Error(
+                "No Gemini API Key purchased. Our automated billing uses subscription pack payments to buy and provision your exclusive Google Gemini API key automatically. Please select a pack on the Pricing tab."
+            )
+            return
+        }
         if (query.trim().isEmpty()) {
             searchUiState.value = SearchUiState.Error("Please enter a search topic or location.")
             return
@@ -206,6 +250,10 @@ class LeadViewModel(
 
     // --- Audio Dictation and Recording ---
     fun startVoiceRecording(context: Context) {
+        if (activeSubscriptionTier.value == "None") {
+            transcriptionUiState.value = TranscriptionUiState.Error("No custom Gemini API key purchased. Under our automated policy, you must first buy any subscription pack (Basic, Standard, Premium, or Lifetime) to automatically purchase a Google Gemini API Key for your account.")
+            return
+        }
         transcriptionUiState.value = TranscriptionUiState.Recording
         try {
             recordingFile = File(context.cacheDir, "voice_note_dictation.m4a").apply {

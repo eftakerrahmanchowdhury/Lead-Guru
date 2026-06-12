@@ -2,6 +2,8 @@ package com.example.ui.screens
 
 import android.content.Context
 import android.widget.Toast
+import android.app.Activity
+import com.example.ui.billing.PlayBillingManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.RepeatMode
@@ -37,6 +39,7 @@ import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Directions
 import androidx.compose.material.icons.filled.EditNote
@@ -118,16 +121,20 @@ enum class DashboardTab(val title: String, val icon: ImageVector) {
     SEARCH("Search Maps", Icons.Default.Search),
     LEADS("Leads", Icons.Default.ListAlt),
     VOICE("Voice Memo", Icons.Default.Mic),
-    ANALYTICS("Analytics", Icons.Default.Analytics)
+    ANALYTICS("Analytics", Icons.Default.Analytics),
+    PRICING("Pricing", Icons.Default.Star)
 }
 
 @Composable
 fun MainDashboard(
     viewModel: LeadViewModel,
+    billingManager: PlayBillingManager,
+    activity: Activity,
     modifier: Modifier = Modifier,
     onLogout: (() -> Unit)? = null
 ) {
     var currentTab by remember { mutableStateOf(DashboardTab.SEARCH) }
+    val activeTier by viewModel.activeSubscriptionTier.collectAsState()
     val context = LocalContext.current
 
     Scaffold(
@@ -197,6 +204,7 @@ fun MainDashboard(
             // Elegant Header
             HeaderBlock(
                 title = currentTab.title,
+                activeTier = activeTier,
                 onLogout = onLogout
             )
 
@@ -206,6 +214,7 @@ fun MainDashboard(
                     DashboardTab.LEADS -> LeadsTabScreen(viewModel, context)
                     DashboardTab.VOICE -> VoiceTabScreen(viewModel, context)
                     DashboardTab.ANALYTICS -> AnalyticsTabScreen(viewModel)
+                    DashboardTab.PRICING -> PricingTabScreen(viewModel, billingManager, activity)
                 }
             }
         }
@@ -215,6 +224,7 @@ fun MainDashboard(
 @Composable
 fun HeaderBlock(
     title: String,
+    activeTier: String,
     onLogout: (() -> Unit)? = null
 ) {
     Row(
@@ -225,13 +235,38 @@ fun HeaderBlock(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column {
-            Text(
-                text = "LOCAL BUSINESS",
-                color = GeoPrimary,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                letterSpacing = 1.5.sp
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "LOCAL BUSINESS",
+                    color = GeoPrimary,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 1.5.sp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                // Subscription badge
+                val (badgeBg, badgeFg) = when (activeTier) {
+                    "Basic" -> Pair(GeoSecondaryContainer, GeoOnSecondaryContainer)
+                    "Standard" -> Pair(Color(0xFFD0E4FF), Color(0xFF001D35))
+                    "Premium" -> Pair(GeoPrimaryContainer, GeoOnPrimaryContainer)
+                    "Life Time Access" -> Pair(Color(0xFFFFE082), Color(0xFF5D4037))
+                    else -> Pair(GeoItemBg, GeoSubduedText)
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(badgeBg)
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = activeTier.uppercase(),
+                        color = badgeFg,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+            }
             Text(
                 text = title,
                 color = GeoOnSurface,
@@ -268,12 +303,55 @@ fun SearchTabScreen(viewModel: LeadViewModel, context: Context) {
     var query by remember { mutableStateOf("") }
     val searchUiState by viewModel.searchUiState.collectAsState()
     val transcriptionUiState by viewModel.transcriptionUiState.collectAsState()
+    val activeTier by viewModel.activeSubscriptionTier.collectAsState()
 
     // Sync query with voice transcription success
     if (transcriptionUiState is TranscriptionUiState.Success) {
         query = (transcriptionUiState as TranscriptionUiState.Success).text
         viewModel.resetVoiceMemo() // clear transcription state after applying to input
         Toast.makeText(context, "Voice transcription loaded into search!", Toast.LENGTH_SHORT).show()
+    }
+
+    // Dynamic limits info
+    val limitText = when (activeTier) {
+        "None" -> "No Active Subscription / Gemini API Key"
+        "Basic" -> "Basic Plan API: 100 queries/day limit."
+        "Standard" -> "Standard Plan API: 1,000 queries/day limit."
+        "Premium" -> "Premium Plan API: Unlimited queries/day."
+        "Life Time Access" -> "Lifetime Access: Permanent unlimited queries."
+        else -> "No Active Subscription / Gemini API Key"
+    }
+    val limitDetail = when (activeTier) {
+        "None" -> "Scan is locked. Choose a plan on the Pricing tab to buy your Google Gemini key automatically."
+        "Basic" -> "Standard scan speeds. Active API limit for basic price ($19/mo)."
+        "Standard" -> "Priority scan speeds. Active API limit for standard price ($49/mo)."
+        "Premium" -> "Hyper-speed scan stream. Active API limit for premium price ($99/mo)."
+        "Life Time Access" -> "Infinite limits. Active API lock for lifetime price ($399)."
+        else -> "Scan is locked."
+    }
+    val limitUsageText = when (activeTier) {
+        "None" -> "0% API capacity allocated (Active key missing)"
+        "Basic" -> "15% of daily API capacity consumed"
+        "Standard" -> "2.3% of daily API capacity consumed"
+        "Premium" -> "All features fully unlocked"
+        "Life Time Access" -> "Infinite bandwidth allocated"
+        else -> "0% capacity"
+    }
+    val limitProgress = when (activeTier) {
+        "None" -> 0.05f
+        "Basic" -> 0.15f
+        "Standard" -> 0.023f
+        "Premium" -> 1.0f
+        "Life Time Access" -> 1.0f
+        else -> 0.0f
+    }
+    val limitProgressColor = when (activeTier) {
+        "None" -> GeoAlertError
+        "Basic" -> GeoPrimary
+        "Standard" -> Color(0xFF1565C0)
+        "Premium" -> GeoSuccessEmerald
+        "Life Time Access" -> Color(0xFFFFB300)
+        else -> GeoAlertError
     }
 
     Column(
@@ -293,6 +371,66 @@ fun SearchTabScreen(viewModel: LeadViewModel, context: Context) {
             fontSize = 12.sp,
             modifier = Modifier.padding(bottom = 12.dp)
         )
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp),
+            colors = CardDefaults.cardColors(containerColor = GeoItemBg),
+            shape = RoundedCornerShape(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.TrendingUp,
+                        contentDescription = null,
+                        tint = limitProgressColor,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = limitText,
+                        color = GeoOnSurface,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Text(
+                    text = limitDetail,
+                    color = GeoSubduedText,
+                    fontSize = 10.sp,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = limitUsageText,
+                        color = GeoSubduedText,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(GeoBorder.copy(alpha = 0.3f))
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .fillMaxWidth(limitProgress)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(limitProgressColor)
+                    )
+                }
+            }
+        }
 
         // Query input row
         Row(
@@ -1386,3 +1524,470 @@ fun FunnelLevelRow(stage: String, count: Int, total: Int, color: Color) {
         }
     }
 }
+
+// ==================== SUBSCRIPTION PRICING TAB SCREEN ====================
+
+@Composable
+fun PricingTabScreen(
+    viewModel: LeadViewModel,
+    billingManager: PlayBillingManager,
+    activity: Activity
+) {
+    val activeTier by viewModel.activeSubscriptionTier.collectAsState()
+    val isBillingServiceConnected by billingManager.isBillingServiceConnected.collectAsState()
+    val isSandboxModeActive by billingManager.isSandboxModeActive.collectAsState()
+    val billingStatusText by billingManager.billingStatusText.collectAsState()
+    val context = LocalContext.current
+
+    val packages = listOf(
+        SubscriptionPack(
+            id = "Basic",
+            productId = "basic_subscription_pack",
+            title = "Basic Pack",
+            price = "$19",
+            period = "/ Month",
+            description = "Ideal for single-operators and small regional freelancers.",
+            color = GeoPrimary,
+            features = listOf(
+                "Active API For The Pack Price",
+                "Up to 100 Lead lookups daily",
+                "Standard speed transcription",
+                "Raw spreadsheet exporter (.csv)"
+            )
+        ),
+        SubscriptionPack(
+            id = "Standard",
+            productId = "standard_subscription_pack",
+            title = "Standard Pack",
+            price = "$49",
+            period = "/ Month",
+            description = "Perfect for growing marketing and local SEO agencies.",
+            color = Color(0xFF1565C0),
+            tag = "POPULAR",
+            features = listOf(
+                "Active API For The Pack Price",
+                "Up to 1,000 Lead lookups daily",
+                "Priority Gemini-3.5-Flash transcription",
+                "Enhanced analytics dashboard",
+                "24/7 technical customer support"
+            )
+        ),
+        SubscriptionPack(
+            id = "Premium",
+            productId = "premium_subscription_pack",
+            title = "Premium Pack",
+            price = "$99",
+            period = "/ Month",
+            description = "Full B2B lead generation suite for professional hunters.",
+            color = Color(0xFF6750A4),
+            tag = "BEST VALUE",
+            features = listOf(
+                "Active API For The Pack Price",
+                "Unlimited daily Google Maps queries",
+                "Hyper-speed priority transcription queue",
+                "AI-grounded conversion analyzer access",
+                "Advanced integration endpoints"
+            )
+        ),
+        SubscriptionPack(
+            id = "Life Time Access",
+            productId = "lifetime_subscription_pack",
+            title = "Life Time Access",
+            price = "$399",
+            period = " One-time",
+            description = "Permanent legacy access for strategic builders.",
+            color = Color(0xFFFFB300),
+            tag = "PRESTIGE",
+            features = listOf(
+                "Active API For The Pack Price",
+                "Permanent unlimited B2B queries",
+                "Zero monthly recurring subscriptions",
+                "Direct API data pipeline export",
+                "First-priority feature updates"
+            )
+        )
+    )
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 16.dp)
+    ) {
+        item {
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = "Lead Guru Subscription Tiers",
+                color = GeoOnSurface,
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 18.sp,
+                letterSpacing = (-0.5).sp
+            )
+            Text(
+                text = "Choose a power pack. All tiers dynamically configure the active API level and capacity limit matching the pack price.",
+                color = GeoSubduedText,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
+                modifier = Modifier.padding(top = 4.dp, bottom = 12.dp)
+            )
+        }
+
+        // GOOGLE PLAY BILLING STATUS DIAGNOSTICS CARD
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+                    .border(
+                        BorderStroke(1.dp, if (isSandboxModeActive) Color(0xFFFFB300).copy(alpha = 0.4f) else GeoPrimary.copy(alpha = 0.4f)),
+                        RoundedCornerShape(16.dp)
+                    ),
+                colors = CardDefaults.cardColors(containerColor = GeoSurface),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(14.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isBillingServiceConnected) Color(0xFF2ECC71) else if (isSandboxModeActive) Color(0xFFFFB300) else GeoAlertError)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "GOOGLE PLAY BILLING STATE",
+                                fontWeight = FontWeight.ExtraBold,
+                                fontSize = 10.sp,
+                                color = if (isBillingServiceConnected) Color(0xFF2ECC71) else if (isSandboxModeActive) Color(0xFFFFB300) else GeoAlertError
+                            )
+                        }
+
+                        if (isSandboxModeActive) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFFFFB300).copy(alpha = 0.15f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "SANDBOX FALLBACK",
+                                    color = Color(0xFFFFB300),
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(Color(0xFF2ECC71).copy(alpha = 0.15f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "LIVE SYSTEM",
+                                    color = Color(0xFF2ECC71),
+                                    fontSize = 8.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = billingStatusText,
+                        color = GeoOnSurface,
+                        fontSize = 11.sp,
+                        lineHeight = 15.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "To deploy in production, register the package \"com.aistudio.mapleads.wxbzpt\" in play console under \"Subscriptions\" matching original product IDs.",
+                        color = GeoSubduedText,
+                        fontSize = 9.sp,
+                        lineHeight = 12.sp
+                    )
+                }
+            }
+        }
+
+        item {
+            val purchasedKey by viewModel.purchasedApiKey.collectAsState()
+            val purchasedPrice by viewModel.apiKeyPurchasePrice.collectAsState()
+            val purchaseStatus by viewModel.apiKeyPurchaseStatus.collectAsState()
+
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 20.dp)
+                    .border(
+                        BorderStroke(1.dp, if (activeTier == "None") GeoAlertError.copy(alpha = 0.5f) else GeoSuccessEmerald.copy(alpha = 0.5f)),
+                        RoundedCornerShape(16.dp)
+                    ),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (activeTier == "None") GeoAlertError.copy(alpha = 0.05f) else GeoSuccessEmerald.copy(alpha = 0.05f)
+                ),
+                shape = RoundedCornerShape(16.dp)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(if (activeTier == "None") GeoAlertError else GeoSuccessEmerald)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (activeTier == "None") "AUTO GEMINI API: INACTIVE" else "AUTO GEMINI API: REGISTERED",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = if (activeTier == "None") GeoAlertError else GeoSuccessEmerald
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Text(
+                        text = if (activeTier == "None") {
+                            "No pack is active yet. Purchase any subscription pack below and the price amount will be used to automatically buy a Google Gemini API Key for your account."
+                        } else {
+                            "Successfully bought an exclusive Gemini API Key on your behalf with your $purchasedPrice package deposit! Fully automated and instantly provisioned."
+                        },
+                        color = GeoOnSurface,
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
+                    )
+
+                    purchasedKey?.let { key ->
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(GeoItemBg)
+                                .padding(10.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "PROVISIONED KEY (AUTOMATICALLY BOUGHT)",
+                                        fontSize = 8.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = GeoSubduedText
+                                    )
+                                    Text(
+                                        text = key,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = GeoOnSurface,
+                                        modifier = Modifier.padding(top = 2.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = {
+                                        val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                        val clip = android.content.ClipData.newPlainText("Gemini API Key", key)
+                                        clipboardManager.setPrimaryClip(clip)
+                                        Toast.makeText(context, "Copied Gemini Key!", Toast.LENGTH_SHORT).show()
+                                    },
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.ContentCopy,
+                                        contentDescription = "Copy key",
+                                        tint = GeoPrimary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        items(packages) { pack ->
+            val isCurrent = activeTier == pack.id
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+                    .border(
+                        width = if (isCurrent) 2.dp else 1.dp,
+                        color = if (isCurrent) pack.color else GeoBorder.copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(20.dp)
+                    ),
+                colors = CardDefaults.cardColors(containerColor = GeoSurface),
+                shape = RoundedCornerShape(20.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = if (isCurrent) 4.dp else 1.dp)
+            ) {
+                Column(modifier = Modifier.padding(20.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = pack.title,
+                                color = pack.color,
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = pack.description,
+                                color = GeoSubduedText,
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+
+                        if (pack.tag != null) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(pack.color.copy(alpha = 0.15f))
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = pack.tag,
+                                    color = pack.color,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    letterSpacing = 0.5.sp
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Row(verticalAlignment = Alignment.Bottom) {
+                        Text(
+                            text = pack.price,
+                            color = GeoOnSurface,
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.Black
+                        )
+                        Text(
+                            text = pack.period,
+                            color = GeoSubduedText,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(bottom = 4.dp, start = 2.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    DividerCustom()
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Feature List
+                    pack.features.forEach { feature ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = "Included Feature",
+                                tint = if (feature == "Active API For The Pack Price") Color(0xFF2ECC71) else pack.color,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = feature,
+                                color = if (feature == "Active API For The Pack Price") GeoOnSurface else GeoSubduedText,
+                                fontSize = 12.sp,
+                                fontWeight = if (feature == "Active API For The Pack Price") FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    // Activate / Purchase Button - Triggers real Play Billing client, or Sandbox fallback
+                    Button(
+                        onClick = {
+                            if (!isCurrent) {
+                                if (isSandboxModeActive) {
+                                    billingManager.forceSandboxOfflineTrigger(pack.id)
+                                    Toast.makeText(
+                                        context,
+                                        "Sandbox Payment Succeeded!\nSuccessfully upgraded to ${pack.title}! Automatically purchased a personal Google Gemini API Key for you.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                } else {
+                                    billingManager.launchBillingFlow(activity, pack.productId, pack.id)
+                                    Toast.makeText(
+                                        context,
+                                        "Connecting with Google Play Checkout API for ${pack.title}...",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(44.dp)
+                            .testTag("subscribe_btn_${pack.id.lowercase().replace(" ", "_")}"),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (isCurrent) pack.color.copy(alpha = 0.1f) else pack.color,
+                            contentColor = if (isCurrent) pack.color else Color.White
+                        ),
+                        shape = RoundedCornerShape(22.dp),
+                        enabled = !isCurrent
+                    ) {
+                        Text(
+                            text = if (isCurrent) "ACTIVE API CONFIGURATION" else "ACTIVATE INTERACTIVE PLAN",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        item {
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+fun DividerCustom() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(GeoBorder.copy(alpha = 0.3f))
+    )
+}
+
+data class SubscriptionPack(
+    val id: String,
+    val productId: String,
+    val title: String,
+    val price: String,
+    val period: String,
+    val description: String,
+    val color: Color,
+    val tag: String? = null,
+    val features: List<String>
+)

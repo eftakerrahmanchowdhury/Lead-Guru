@@ -19,8 +19,11 @@ import com.example.ui.LeadViewModel
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.screens.LoginScreen
 import com.example.ui.screens.MainDashboard
+import com.example.ui.billing.PlayBillingManager
 
 class MainActivity : ComponentActivity() {
+    private lateinit var billingManager: PlayBillingManager
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -45,6 +48,11 @@ class MainActivity : ComponentActivity() {
             LeadViewModel.Factory(leadRepository, geminiRepository)
         )[LeadViewModel::class.java]
 
+        // 4. Initialize Play Billing Manager
+        billingManager = PlayBillingManager(this) { tierId ->
+            viewModel.selectSubscriptionTier(tierId)
+        }
+
         setContent {
             MyApplicationTheme {
                 var isLoggedIn by rememberSaveable { mutableStateOf(false) }
@@ -52,6 +60,8 @@ class MainActivity : ComponentActivity() {
                 if (isLoggedIn) {
                     MainDashboard(
                         viewModel = viewModel,
+                        billingManager = billingManager,
+                        activity = this,
                         modifier = Modifier.fillMaxSize(),
                         onLogout = { isLoggedIn = false }
                     )

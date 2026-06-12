@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Map Lead Tracker</string>
+    <string name="app_name">Lead Guru</string>
     <string name="login_title">Welcome Back</string>
     <string name="login_subtitle">Access your local B2B lead intelligence engine</string>
     <string name="login_username_label">Email Address</string>
