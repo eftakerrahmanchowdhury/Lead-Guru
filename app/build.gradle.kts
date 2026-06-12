@@ -5,6 +5,7 @@ plugins {
   alias(libs.plugins.roborazzi)
   alias(libs.plugins.secrets)
   id("com.android.application")
+  id("com.google.gms.google-services")
   id("com.google.gms.google-services") version "4.4.4" apply false
 }
 
