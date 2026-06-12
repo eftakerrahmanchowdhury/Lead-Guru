@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "917177762939",
+    "project_id": "lead-guru-8b719",
+    "storage_bucket": "lead-guru-8b719.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:917177762939:android:492e636ea3b581b73e0ede",
+        "android_client_info": {
+          "package_name": "com.rabon.leadguru"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDLjWPJs7Ud7OqnpYjDgNTr3PJ5Si-QmOM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
